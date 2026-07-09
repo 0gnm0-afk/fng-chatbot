@@ -10,11 +10,3 @@ venv/
 
 *.log
 
-# Local AI workflow notes, not part of the public app repository.
-AGENTS.md
-CLAUDE.md
-HANDOFF.md
-TASKS.md
-CHECKPOINT.md
-WORKLOG.md
-DECISIONS.md
