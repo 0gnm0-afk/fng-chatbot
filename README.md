@@ -4,7 +4,7 @@ CNN Fear & Greed 지수를 매일 확인해 Telegram 채널로 알림을 보내�
 
 - 스택: Python (Flask, requests, FinanceDataReader), `Procfile` 기반 배포
 - 데이터 소스: `production.dataviz.cnn.io` F&G API
-- 취업 자소서에 등장하는 실제 프로젝트이기도 함 (경험 카드: `../취업/10_경험/FNG-알림봇-개발.md`)
+
 
 ## 환경변수
 
