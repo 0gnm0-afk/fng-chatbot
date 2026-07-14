@@ -1,14 +1,17 @@
-import requests
+import hmac
 import os
+
+import requests
 import FinanceDataReader as fdr
 from datetime import datetime, timedelta
 import pytz
-from flask import Flask
+from flask import Flask, request
 
 app = Flask(__name__)
 
 BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
+JOB_TOKEN = os.environ.get("JOB_TOKEN")
 
 # --- 시간대 설정 ---
 KST = pytz.timezone('Asia/Seoul')
@@ -305,13 +308,30 @@ def format_market_data_message(data, investor_data=None):
     return "\n".join(lines)
 
 
-## 핵심 실행 함수
-@app.route('/', methods=['GET', 'POST'])
+## HTTP 엔드포인트
+@app.get("/")
+def index():
+    """부작용 없는 기본 상태 확인."""
+    return "fng-chatbot is running", 200
+
+
+@app.get("/healthz")
+def healthz():
+    """배포 플랫폼과 모니터링 서비스용 상태 확인."""
+    return "ok", 200
+
+
+@app.post("/send")
 def send_fear_and_greed():
+    supplied_token = request.headers.get("X-JOB-TOKEN", "")
+    if not JOB_TOKEN or not hmac.compare_digest(supplied_token, JOB_TOKEN):
+        return "unauthorized", 401
+
     bot_token = BOT_TOKEN
     chat_id = CHAT_ID
     if not bot_token or not chat_id:
-        return "TELEGRAM_BOT_TOKEN 또는 TELEGRAM_CHAT_ID 환경변수가 설정되지 않았습니다.", 500
+        return "service unavailable", 503
+
     try:
         today_score, previous_score = get_fng_scores()
         strategy_message = generate_strategy_message(today_score, previous_score)
@@ -329,12 +349,17 @@ def send_fear_and_greed():
         }
 
         resp = requests.post(send_url, json=payload, timeout=10)
-        print(f"텔레그램 응답: {resp.status_code} {resp.text[:200]}")
+        resp.raise_for_status()
+        telegram_result = resp.json()
+        if telegram_result.get("ok") is not True:
+            raise RuntimeError("Telegram API returned ok=false")
 
         return "전송 성공", 200
-    except Exception as e:
-        print(f"오류: {e}")
-        return f"오류 발생: {e}", 500
+    except Exception as exc:
+        # 예외 메시지에는 Telegram Bot API URL과 토큰이 포함될 수 있으므로
+        # 외부 응답과 로그에는 예외 종류만 남긴다.
+        app.logger.error("message delivery failed (%s)", type(exc).__name__)
+        return "message delivery failed", 502
 
 
 if __name__ == "__main__":
